@@ -1,4 +1,3 @@
 node_modules/
-docs/js/
 package-lock.json
 src/config.ts
