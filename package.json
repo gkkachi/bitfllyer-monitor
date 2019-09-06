@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "webpack --mode production",
-    "start": "bash start.sh"
+    "start": "bash start.sh",
+    "push": "npm run build && git commit -a && git push"
   },
   "devDependencies": {
     "@material-ui/core": "^4.4.0",
