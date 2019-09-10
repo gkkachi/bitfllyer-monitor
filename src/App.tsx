@@ -1,60 +1,84 @@
-import React from 'react'
-import firebase from 'firebase'
-import { Button, Container, Typography, List, ListItem, ListItemText } from '@material-ui/core'
+import React, { useEffect } from 'react';
+import { useKV } from 'react-hooks-kv'
 
-import { firebaseConfig } from './config'
+import {
+  Container,
+  Grid,
+  List,
+  ListItem,
+  ListItemText,
+  Paper,
+  Typography
+} from '@material-ui/core'
 
-firebase.initializeApp(firebaseConfig)
+import io from 'socket.io-client'
 
-const kvNested = (obj: Object, prefix = '') => {
-  let res: [string, string][] = []
-  Object.entries(obj).forEach(([k, v]) => {
-    const key = prefix + '/' + k
-    switch (typeof v) {
-      case "bigint":
-      case "boolean":
-      case "number":
-      case "string":
-        res.push([key, v.toString()])
-        break
-      case "object":
-        if (v) {
-          res = res.concat(kvNested(v, key))
-        } else {
-          res.push([key, 'null'])
-        }
-        break
-      default:
-        res.push([key, typeof v])
-    }
-  })
-  return res
+interface ITicker {
+  "product_code": string,
+  "timestamp": string,
+  "tick_id": number,
+  "best_bid": number,
+  "best_ask": number,
+  "best_bid_size": number,
+  "best_ask_size": number,
+  "total_bid_depth": number,
+  "total_ask_depth": number,
+  "ltp": number,
+  "volume": number,
+  "volume_by_product": number
 }
+
+const socket = io("https://io.lightstream.bitflyer.com", { transports: ["websocket"] });
+const channels = ["BTC_JPY", "FX_BTC_JPY", "ETH_BTC", "BCH_BTC", "BTCJPY_MAT3M", "BTCJPY_MAT1WK", "BTCJPY_MAT2WK"].map(x => 'lightning_ticker_' + x)
 
 const App: React.FC = () => {
-  const [user, setUser] = React.useState<firebase.User | null>()
-  React.useEffect(() => firebase.auth().onAuthStateChanged(setUser), [])
-  const provider = new firebase.auth.GoogleAuthProvider()
-  const auth = firebase.auth()
+  const [tickers, setTicker] = useKV<ITicker>()
 
-  return <Container maxWidth="lg">
-    <Typography variant="h2">React + Firebase + MaterialUI using CDN</Typography>
-    <Typography variant="h4" component="p"><a href="https://qiita.com/K-Kachi/items/cff0c7fb1a84640c8ac0">Document</a></Typography>
-    <Button {...{
-      variant: "contained",
-      color: user ? 'default' : 'primary',
-      onClick: user ?
-        () => auth.signOut().catch(console.error) :
-        () => auth.signInWithPopup(provider).catch(console.error)
-    }}>{user ? 'sign out' : 'sign in'}</Button>
-    {user ?
-      <List>
-        {kvNested(user.toJSON())
-          .map(([s, x]) => <ListItem key={s}><ListItemText primary={s} secondary={x} /></ListItem>)}
-      </List> :
-      <Typography variant="h4" component="p">Sign in, PLEASE!</Typography>
-    }
-  </Container>
+  useEffect(() => {
+    socket.on("connect", () => {
+      channels.forEach(channel => {
+        console.log('subscribe' + channel)
+        socket.emit('subscribe', channel)
+      })
+    })
+
+    socket.on("error", console.error)
+  }, [])
+
+  useEffect(() => {
+    channels.forEach(channel => {
+      socket.on(channel, (x: ITicker) => {
+        console.log(x)
+        setTicker(channel, x)
+      })
+    })
+    return () => channels.forEach(channel => {
+      socket.off(channel)
+    })
+  }, [setTicker])
+
+  return (
+    <Container maxWidth="lg">
+      <Typography variant="h2">bitFlyer Monitor</Typography>
+      <br />
+      <Grid container spacing={2}>
+        {Object.values(tickers).map(value => (
+          <Grid key={value.tick_id} item xs={12} sm={6} lg={3}>
+            <Paper>
+              <Typography variant="h4">{value.product_code}</Typography>
+              <List dense={true}>
+                {Object.entries(value).map(([k, v]) => (
+                  <ListItem>
+                    <ListItemText key={k} primary={k} secondary={v} />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+    </Container>
+  );
 }
 
-export default App
+export default App;

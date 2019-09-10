@@ -18,10 +18,6 @@ module.exports = {
   externals: {
     'react': 'React',
     'react-dom': 'ReactDOM',
-    'firebase': 'firebase',
-    'firebase/auth': '',
-    'firebase/storage': '',
-    'firebase/firestore': '',
     '@material-ui/core': 'MaterialUI'
   },
   devServer: {
